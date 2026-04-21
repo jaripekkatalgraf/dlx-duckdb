@@ -1,30 +1,29 @@
 cmake_minimum_required(VERSION 3.5)
 
-# Set extension name here
-set(TARGET_NAME quack)
-
-# DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
-# used in cmake with find_package. Feel free to remove or replace with other dependencies.
-# Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
-find_package(OpenSSL REQUIRED)
-
+set(TARGET_NAME dlx)
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
-set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 
 project(${TARGET_NAME})
-include_directories(src/include)
 
-set(EXTENSION_SOURCES src/quack_extension.cpp)
+# CMAKE_CURRENT_SOURCE_DIR always points to this file's directory,
+# regardless of where DuckDB's build machinery invokes cmake from.
+set(EXT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+
+set(EXTENSION_SOURCES
+    ${EXT_ROOT}/src/dlx_extension.cpp
+    ${EXT_ROOT}/src/dlx_function.cpp
+)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
+target_include_directories(${EXTENSION_NAME} PRIVATE
+    ${EXT_ROOT}/src
+    ${EXT_ROOT}/src/include
+)
+set_property(TARGET ${EXTENSION_NAME} PROPERTY CXX_STANDARD 17)
+
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
-
-# Link OpenSSL in both the static library as the loadable extension
-target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
-
-install(
-  TARGETS ${EXTENSION_NAME}
-  EXPORT "${DUCKDB_EXPORT_SET}"
-  LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
-  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")
+target_include_directories(${TARGET_NAME}_loadable_extension PRIVATE
+    ${EXT_ROOT}/src
+    ${EXT_ROOT}/src/include
+)
+set_property(TARGET ${TARGET_NAME}_loadable_extension PROPERTY CXX_STANDARD 17)

@@ -1,0 +1,120 @@
+# test/sql/dlx.test
+# Run with: make test
+
+require dlx
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 1. Knuth's original example  (arxiv:cs/0011047, Table 1)
+#
+#    7 columns.  Matrix (0-indexed columns):
+#      row 0: {2,4,5}    row 2: {1,2,5}    row 4: {1,6}
+#      row 1: {0,3,6}    row 3: {0,3}      row 5: {3,4,6}
+#
+#    Unique exact cover: rows 0, 3, 4
+#      {2,4,5} ∪ {0,3} ∪ {1,6} = {0,1,2,3,4,5,6} ✓
+# ═══════════════════════════════════════════════════════════════════════════
+
+query II rowsort
+SELECT solution_id, row_index
+FROM dlx_solve(7, [
+    [2,4,5], [0,3,6], [1,2,5], [0,3], [1,6], [3,4,6]
+]);
+----
+0	0
+0	3
+0	4
+
+query I
+SELECT solution_count
+FROM dlx_count(7, [[2,4,5],[0,3,6],[1,2,5],[0,3],[1,6],[3,4,6]]);
+----
+1
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2. Multiple solutions
+#    3 columns, 6 rows.  4 exact covers exist.
+# ═══════════════════════════════════════════════════════════════════════════
+
+query I
+SELECT count(DISTINCT solution_id)
+FROM dlx_solve(3, [[0],[1],[2],[0,1],[1,2],[0,1,2]]);
+----
+4
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3. Generalised exact cover: 4-Queens (2 solutions expected)
+#
+#    Primary 0..7: ranks 0-3 + files 4-7
+#    Secondary 8..21: 7 "/" diagonals (8-14) + 7 "\" diagonals (15-21)
+#    num_secondary := 14
+# ═══════════════════════════════════════════════════════════════════════════
+
+query I
+SELECT solution_count
+FROM dlx_count(8, [
+    [0,4, 8,18],[0,5, 9,19],[0,6,10,20],[0,7,11,21],
+    [1,4, 9,17],[1,5,10,18],[1,6,11,19],[1,7,12,20],
+    [2,4,10,16],[2,5,11,17],[2,6,12,18],[2,7,13,19],
+    [3,4,11,15],[3,5,12,16],[3,6,13,17],[3,7,14,18]
+], num_secondary := 14);
+----
+2
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 4. max_solutions cap
+# ═══════════════════════════════════════════════════════════════════════════
+
+query I
+SELECT count(DISTINCT solution_id)
+FROM dlx_solve(3, [[0],[1],[2],[0,1],[1,2],[0,1,2]], max_solutions := 2);
+----
+2
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 5. No solution
+# ═══════════════════════════════════════════════════════════════════════════
+
+query II
+SELECT solution_id, row_index
+FROM dlx_solve(3, [[0,1],[0,2],[1,2]]);
+----
+
+query I
+SELECT solution_count FROM dlx_count(3, [[0,1],[0,2],[1,2]]);
+----
+0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. Reconstruct solution rows by joining back to the problem definition
+# ═══════════════════════════════════════════════════════════════════════════
+
+query II rowsort
+WITH
+  problem(row_idx, cols) AS (
+    VALUES (0, [2,4,5]),(1,[0,3,6]),(2,[1,2,5]),(3,[0,3]),(4,[1,6]),(5,[3,4,6])
+  ),
+  solution AS (
+    SELECT row_index
+    FROM dlx_solve(7, [[2,4,5],[0,3,6],[1,2,5],[0,3],[1,6],[3,4,6]])
+  )
+SELECT p.row_idx, p.cols
+FROM solution s JOIN problem p ON p.row_idx = s.row_index
+ORDER BY p.row_idx;
+----
+0	[2, 4, 5]
+3	[0, 3]
+4	[1, 6]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 7. Error handling
+# ═══════════════════════════════════════════════════════════════════════════
+
+statement error
+SELECT * FROM dlx_solve(3, [[0,1],[5,6]]);
+----
+Column index 5 out of range
+
+statement error
+SELECT * FROM dlx_solve(0, [[0]]);
+----
+num_primary must be >= 1
