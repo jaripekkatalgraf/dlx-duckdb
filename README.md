@@ -6,7 +6,7 @@ Exact cover solver using Knuth's Algorithm DLX, exposed as DuckDB table function
 
 ```bash
 # 1. Clone this repo alongside the extension-template submodules
-git clone --recurse-submodules https://github.com/<you>/dlx-duckdb.git
+git clone --recurse-submodules https://github.com/jaripekkatalgraf/dlx-duckdb.git
 cd dlx-duckdb
 
 # 2. Optional but recommended: install ccache + ninja for fast rebuilds
@@ -57,7 +57,7 @@ FROM dlx_solve(7, [
     [1,2,3,4,5],  -- row 2
     [0,3],        -- row 3
     [1,2,5,6],    -- row 4
-    [3,4,6]       -- row 5
+    [1,6]         -- row 5
 ]);
 -- solution_id │ row_index
 -- ────────────┼──────────
